@@ -1,6 +1,6 @@
 {
   "name": "@dverdeciav/devflow-cli",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AI-powered Git CLI with human-in-the-loop control. Works with GitHub (gh) and Azure DevOps (az).",
   "main": "dist/cli/index.js",
   "bin": {
