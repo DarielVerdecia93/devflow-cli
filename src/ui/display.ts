@@ -97,6 +97,28 @@ export function printStep(step: number, total: number, label: string): void {
   console.log(chalk.cyan(`\n  [${step}/${total}] ${label}`));
 }
 
+export function printBranchStep(branch: string): void {
+  console.log(chalk.gray('\n' + '─'.repeat(50)));
+  console.log(chalk.bold('  Suggested branch:'));
+  console.log(chalk.yellow(`\n    ${branch}\n`));
+}
+
+export function printCommitStep(msg: string): void {
+  console.log(chalk.gray('\n' + '─'.repeat(50)));
+  console.log(chalk.bold('  Suggested commit message:'));
+  console.log(chalk.white(`\n    ${msg}\n`));
+}
+
+export function printPRStep(title: string, desc: string, baseBranch: string): void {
+  console.log(chalk.gray('\n' + '─'.repeat(50)));
+  console.log(chalk.bold('  PR Title:'));
+  console.log(chalk.white(`\n    ${title}`));
+  console.log(chalk.bold('\n  PR Description:'));
+  desc.split('\n').forEach(line => console.log(chalk.gray(`    ${line}`)));
+  console.log(chalk.bold('\n  Target branch:'));
+  console.log(chalk.magenta(`    ${baseBranch}\n`));
+}
+
 function buildBar(score: number): string {
   const filled = Math.round(score / 10);
   const empty = 10 - filled;

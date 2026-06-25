@@ -133,10 +133,10 @@ No tokens to configure — `gh` and `az` handle authentication on their own. Own
 ### Config priority
 
 ```
-Environment variables  >  .env (project root)  >  ~/.config/devflow/config.json (global)
+System environment variables  >  ~/.config/devflow/config.json (global)
 ```
 
-The `.env` file in the project root can override any global value for that specific repo.
+> **No `.env` file needed.** DevFlow no longer reads `.env` — the single source of truth is `~/.config/devflow/config.json`, managed by `devflow init` and `devflow config`. If you have an old `.env` in your project, you can safely delete it.
 
 ### LLM routing (optional)
 

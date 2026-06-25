@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { LLMRequest, LLMResponse } from '../../types';
 import { config } from '../../config';
-import { buildAnalysisPrompt } from '../prompts';
+import { buildPromptForTask } from '../prompts';
 import { LLMProvider, parseProposalFromText } from './base.provider';
 
 export class AnthropicProvider implements LLMProvider {
@@ -13,7 +13,7 @@ export class AnthropicProvider implements LLMProvider {
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
     const { apiKey, model } = config.llm.anthropic;
-    const prompt = buildAnalysisPrompt(request.diff);
+    const prompt = buildPromptForTask(request.task, request.diff);
 
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',

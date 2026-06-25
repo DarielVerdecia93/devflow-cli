@@ -8,8 +8,7 @@
   },
   "files": [
     "dist/**",
-    "scripts/postinstall.js",
-    ".env.example"
+    "scripts/postinstall.js"
   ],
   "scripts": {
     "build": "tsc",
@@ -45,7 +44,6 @@
     "axios": "^1.7.2",
     "chalk": "^4.1.2",
     "commander": "^12.1.0",
-    "dotenv": "^16.4.5",
     "inquirer": "^8.2.6",
     "ora": "^5.4.1",
     "simple-git": "^3.25.0",

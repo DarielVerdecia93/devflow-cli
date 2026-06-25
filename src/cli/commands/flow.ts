@@ -1,28 +1,24 @@
 import ora from 'ora';
 import { gitService } from '../../git/service';
 import { llmRouter } from '../../llm/router';
-import { azureService } from '../../azure/service';
 import { githubService } from '../../github/service';
+import { azureService } from '../../azure/service';
 import { detectPlatform } from '../../git/platform';
-import { LLMProposal } from '../../types';
+import { LLMProposal, PullRequest } from '../../types';
 import {
-  printBanner, printProposal, printSuccess, printError, printInfo, printStep,
+  printBanner, printBranchStep, printCommitStep, printPRStep,
+  printSuccess, printError, printInfo, printStep,
 } from '../../ui/display';
 import {
-  promptMainAction,
-  promptEditBranch,
-  promptEditCommit,
-  promptEditPR,
-  promptEditBaseBranch,
-  promptCreatePR,
+  promptStepBranch, promptStepCommit, promptStepPR,
+  promptEditBranch, promptEditCommit, promptEditPR,
   promptContinueWithoutStaged,
 } from '../../ui/interactive';
 import { config } from '../../config';
 
 export async function flowCommand(opts: { base?: string } = {}): Promise<void> {
   printBanner();
-
-  console.log('  Running: branch -> commit -> push -> PR\n');
+  console.log('  Running: branch → commit → push → PR\n');
 
   const spinner = ora();
 
@@ -62,58 +58,75 @@ export async function flowCommand(opts: { base?: string } = {}): Promise<void> {
     spinner.succeed(`Proposal ready (${llmResult.provider})`);
 
     let proposal = llmResult.proposal;
-    let baseBranch = opts.base ?? config.git.baseBranch;
-    const hasPR = azureService.isConfigured();
-    let accepted = false;
+    const baseBranch = opts.base ?? config.git.baseBranch;
 
-    while (!accepted) {
-      printProposal(proposal, llmResult.provider, hasPR ? baseBranch : undefined);
-      const action = await promptMainAction(hasPR);
+    // ── Step 1: Branch ────────────────────────────────────────────────────────
+    let finalBranch = proposal.branchSuggestion;
+    while (true) {
+      printBranchStep(finalBranch);
+      const action = await promptStepBranch();
+      if (action === 'accept') break;
+      if (action === 'edit') { finalBranch = await promptEditBranch(finalBranch); break; }
+      if (action === 'cancel') { printInfo('Cancelled. No changes made.'); return; }
+      // regenerate
+      spinner.start('Regenerating...');
+      llmResult = await llmRouter.generate({ task: 'analysis', diff });
+      proposal = llmResult.proposal;
+      finalBranch = proposal.branchSuggestion;
+      spinner.succeed(`New proposal (${llmResult.provider})`);
+    }
 
-      switch (action) {
-        case 'accept':
-          accepted = true;
-          break;
+    // ── Step 2: Commit message ────────────────────────────────────────────────
+    let finalCommit = proposal.commitMessage;
+    while (true) {
+      printCommitStep(finalCommit);
+      const action = await promptStepCommit();
+      if (action === 'accept') break;
+      if (action === 'edit') { finalCommit = await promptEditCommit(finalCommit); break; }
+      if (action === 'cancel') { printInfo('Cancelled. No changes made.'); return; }
+      // regenerate
+      spinner.start('Regenerating...');
+      llmResult = await llmRouter.generate({ task: 'analysis', diff });
+      proposal = llmResult.proposal;
+      finalCommit = proposal.commitMessage;
+      spinner.succeed(`New proposal (${llmResult.provider})`);
+    }
 
-        case 'edit_branch':
-          proposal.branchSuggestion = await promptEditBranch(proposal.branchSuggestion);
-          break;
+    // ── Step 3: PR proposal ───────────────────────────────────────────────────
+    let finalPRTitle = proposal.prTitle;
+    let finalPRDesc = proposal.prDescription;
+    let createPRFlag = false;
 
-        case 'edit_commit':
-          proposal.commitMessage = await promptEditCommit(proposal.commitMessage);
-          break;
-
-        case 'edit_pr': {
-          const edited = await promptEditPR(proposal.prTitle, proposal.prDescription);
-          proposal.prTitle = edited.title;
-          proposal.prDescription = edited.description;
-          break;
-        }
-
-        case 'edit_base':
-          baseBranch = await promptEditBaseBranch(baseBranch);
-          break;
-
-        case 'regenerate':
-          spinner.start('Regenerating...');
-          llmResult = await llmRouter.generate({ task: 'analysis', diff });
-          proposal = llmResult.proposal;
-          spinner.succeed(`New proposal ready (${llmResult.provider})`);
-          break;
-
-        case 'cancel':
-          printInfo('Cancelled. No changes made.');
-          return;
+    while (true) {
+      printPRStep(finalPRTitle, finalPRDesc, baseBranch);
+      const action = await promptStepPR();
+      if (action === 'skip') break;
+      if (action === 'accept') { createPRFlag = true; break; }
+      if (action === 'edit') {
+        const edited = await promptEditPR(finalPRTitle, finalPRDesc);
+        finalPRTitle = edited.title;
+        finalPRDesc = edited.description;
+        createPRFlag = true;
+        break;
       }
+      // regenerate
+      spinner.start('Regenerating PR proposal...');
+      llmResult = await llmRouter.generate({ task: 'pr', diff });
+      finalPRTitle = llmResult.proposal.prTitle;
+      finalPRDesc = llmResult.proposal.prDescription;
+      spinner.succeed(`New PR proposal (${llmResult.provider})`);
     }
 
-    const totalSteps = hasPR ? 5 : 4;
-    const safeBranch = await gitService.safeBranchName(proposal.branchSuggestion);
+    // ── Execute git flow ──────────────────────────────────────────────────────
+    proposal.branchSuggestion = finalBranch;
+    proposal.commitMessage = finalCommit;
+    const safeBranch = await gitService.safeBranchName(finalBranch);
 
-    if (safeBranch !== proposal.branchSuggestion) {
+    if (safeBranch !== finalBranch) {
       printInfo(`Branch renamed to ${safeBranch} (original already exists)`);
-      proposal.branchSuggestion = safeBranch;
     }
+
+    const totalSteps = createPRFlag ? 5 : 4;
 
     printStep(1, totalSteps, `Creating branch: ${safeBranch}`);
     spinner.start();
@@ -127,11 +140,11 @@ export async function flowCommand(opts: { base?: string } = {}): Promise<void> {
 
     printStep(3, totalSteps, 'Committing...');
     spinner.start();
-    await gitService.commit(proposal.commitMessage);
-    spinner.succeed(`Committed: "${proposal.commitMessage}"`);
+    await gitService.commit(finalCommit);
+    spinner.succeed(`Committed: "${finalCommit}"`);
 
-    const hasRemote = await gitService.hasRemote();
     printStep(4, totalSteps, 'Pushing to remote...');
+    const hasRemote = await gitService.hasRemote();
     if (hasRemote) {
       spinner.start();
       await gitService.push(safeBranch);
@@ -140,39 +153,44 @@ export async function flowCommand(opts: { base?: string } = {}): Promise<void> {
       printInfo('No remote configured — skipping push.');
     }
 
-    if (hasPR) {
+    if (createPRFlag) {
       printStep(5, totalSteps, 'Creating Pull Request...');
-      const wantPR = await promptCreatePR();
-      if (wantPR) {
-        spinner.start();
+      spinner.start('Creating Pull Request...');
+      try {
         const platform = await detectPlatform();
         let prUrl: string;
         let prId: string;
 
         if (platform === 'github') {
           const pr = await githubService.createPullRequest({
-            title: proposal.prTitle,
-            description: proposal.prDescription,
+            title: finalPRTitle,
+            description: finalPRDesc,
             sourceBranch: safeBranch,
             targetBranch: baseBranch,
           });
           prUrl = await githubService.buildPRUrl(pr.number);
           prId = `#${pr.number}`;
-        } else {
+        } else if (platform === 'azure') {
           const pr = await azureService.createPullRequest({
-            title: proposal.prTitle,
-            description: proposal.prDescription,
+            title: finalPRTitle,
+            description: finalPRDesc,
             sourceBranch: safeBranch,
             targetBranch: baseBranch,
           });
           prUrl = await azureService.buildPRUrl(pr.pullRequestId);
           prId = `#${pr.pullRequestId}`;
+        } else {
+          spinner.stop();
+          printError('Could not detect platform (GitHub or Azure DevOps) from git remote URL.');
+          printSuccess('Full flow complete (no PR)!');
+          return;
         }
 
         spinner.succeed(`PR created: ${prId}`);
         printInfo(`URL: ${prUrl}`);
-      } else {
-        printInfo('PR skipped.');
+      } catch (err) {
+        spinner.stop();
+        printError(`PR creation failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -180,8 +198,7 @@ export async function flowCommand(opts: { base?: string } = {}): Promise<void> {
 
   } catch (err) {
     spinner.stop();
-    const msg = err instanceof Error ? err.message : String(err);
-    printError(msg);
+    printError(err instanceof Error ? err.message : String(err));
     process.exitCode = 1;
   }
 }

@@ -48,7 +48,7 @@ export class LLMRouter {
     }
 
     const detail = errors.map(e => `  ${e.provider}: ${e.error}`).join('\n');
-    throw new Error(`All LLM providers failed:\n${detail}\n\nEnsure at least one API key is set in .env`);
+    throw new Error(`All LLM providers failed:\n${detail}\n\nRun: devflow config set llm.<provider>.apiKey <key>`);
   }
 
   getConfiguredProviders(): ProviderName[] {
