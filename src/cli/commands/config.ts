@@ -29,7 +29,6 @@ const VALID_KEYS = [
   'llm.gemini.apiKey', 'llm.gemini.model',
   'llm.groq.apiKey', 'llm.groq.model',
   'llm.routing.commit', 'llm.routing.pr', 'llm.routing.analysis', 'llm.routing.default',
-  'azure.org', 'azure.project', 'azure.repo', 'azure.token',
   'git.baseBranch',
 ];
 

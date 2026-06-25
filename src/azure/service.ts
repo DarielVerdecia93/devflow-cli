@@ -1,13 +1,17 @@
-import axios, { AxiosInstance } from 'axios';
+import { run, isInstalled } from '../git/cli-runner';
 import { PullRequest } from '../types';
-import { config, isAzureConfigured } from '../config';
 
-interface AzurePRPayload {
-  title: string;
-  description: string;
-  sourceRefName: string;
-  targetRefName: string;
-  isDraft?: boolean;
+export function parseAzureRemoteUrl(url: string): { org: string; project: string; repo: string } | null {
+  let m = url.match(/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)/);
+  if (m) return { org: m[1], project: m[2], repo: m[3] };
+
+  m = url.match(/([^.]+)\.visualstudio\.com\/([^/]+)\/_git\/([^/]+)/);
+  if (m) return { org: m[1], project: m[2], repo: m[3] };
+
+  m = url.match(/ssh\.dev\.azure\.com[:/]v3\/([^/]+)\/([^/]+)\/([^/]+)/);
+  if (m) return { org: m[1], project: m[2], repo: m[3] };
+
+  return null;
 }
 
 interface AzurePRResponse {
@@ -18,57 +22,46 @@ interface AzurePRResponse {
 }
 
 export class AzureDevOpsService {
-  private client: AxiosInstance;
-
-  constructor() {
-    const { org, project, repo, token } = config.azure;
-    const base64Token = Buffer.from(`:${token}`).toString('base64');
-
-    this.client = axios.create({
-      baseURL: `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repo}`,
-      headers: {
-        Authorization: `Basic ${base64Token}`,
-        'Content-Type': 'application/json',
-      },
-      params: { 'api-version': '7.1' },
-      timeout: 30000,
-    });
+  isInstalled(): boolean {
+    return isInstalled('az');
   }
 
   isConfigured(): boolean {
-    return isAzureConfigured();
+    return this.isInstalled();
   }
 
   async createPullRequest(pr: PullRequest): Promise<AzurePRResponse> {
-    if (!this.isConfigured()) {
+    if (!this.isInstalled()) {
       throw new Error(
-        'Azure DevOps is not configured.\n' +
-        'Set AZURE_DEVOPS_ORG, AZURE_DEVOPS_PROJECT, AZURE_DEVOPS_REPO, AZURE_DEVOPS_TOKEN in .env'
+        'az CLI is not installed.\n' +
+        'Install it from: https://aka.ms/installazurecliwindows\n' +
+        'Then add the DevOps extension: az extension add --name azure-devops\n' +
+        'And authenticate: az login'
       );
     }
 
-    const payload: AzurePRPayload = {
-      title: pr.title,
-      description: pr.description,
-      sourceRefName: `refs/heads/${pr.sourceBranch}`,
-      targetRefName: `refs/heads/${pr.targetBranch}`,
-      isDraft: false,
-    };
+    const output = await run('az', [
+      'repos', 'pr', 'create',
+      '--title', pr.title,
+      '--description', pr.description,
+      '--source-branch', pr.sourceBranch,
+      '--target-branch', pr.targetBranch,
+      '--output', 'json',
+    ]);
 
-    const response = await this.client.post<AzurePRResponse>('/pullrequests', payload);
-    return response.data;
+    const result = JSON.parse(output) as AzurePRResponse;
+    return result;
   }
 
-  async getPullRequests(status: 'active' | 'completed' | 'abandoned' = 'active'): Promise<AzurePRResponse[]> {
-    const response = await this.client.get<{ value: AzurePRResponse[] }>('/pullrequests', {
-      params: { searchCriteria: { status } },
-    });
-    return response.data.value ?? [];
-  }
+  async buildPRUrl(prId: number): Promise<string> {
+    const output = await run('az', [
+      'repos', 'pr', 'show',
+      '--id', String(prId),
+      '--output', 'json',
+    ]).catch(() => '{}');
 
-  buildPRUrl(prId: number): string {
-    const { org, project, repo } = config.azure;
-    return `https://dev.azure.com/${org}/${project}/_git/${repo}/pullrequest/${prId}`;
+    const result = JSON.parse(output) as { url?: string };
+    return result.url ?? '';
   }
 }
 
