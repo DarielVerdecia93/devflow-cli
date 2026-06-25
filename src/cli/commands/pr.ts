@@ -2,13 +2,11 @@ import ora from 'ora';
 import { gitService } from '../../git/service';
 import { detectPlatform } from '../../git/platform';
 import { llmRouter } from '../../llm/router';
-import { azureService } from '../../azure/service';
 import { githubService } from '../../github/service';
-import { printBanner, printProposal, printSuccess, printError, printInfo } from '../../ui/display';
+import { azureService } from '../../azure/service';
+import { printBanner, printPRStep, printSuccess, printError, printInfo } from '../../ui/display';
 import {
-  promptMainAction,
-  promptEditBranch,
-  promptEditCommit,
+  promptStepPR,
   promptEditPR,
   promptEditBaseBranch,
 } from '../../ui/interactive';
@@ -22,11 +20,26 @@ export async function prCommand(opts: { base?: string } = {}): Promise<void> {
   try {
     await gitService.assertRepo();
 
-    if (!azureService.isConfigured()) {
+    spinner.start('Detecting platform...');
+    const platform = await detectPlatform();
+    spinner.stop();
+
+    if (platform === 'unknown') {
       printError(
-        'Azure DevOps not configured.\n' +
-        '  Set AZURE_DEVOPS_ORG, AZURE_DEVOPS_PROJECT, AZURE_DEVOPS_REPO, AZURE_DEVOPS_TOKEN in .env'
+        'Could not detect platform from git remote URL.\n' +
+        '  Make sure your remote points to GitHub (github.com) or Azure DevOps (dev.azure.com).'
       );
+      return;
+    }
+
+    const cliName = platform === 'github' ? 'gh' : 'az';
+    const installed = platform === 'github' ? githubService.isInstalled() : azureService.isInstalled();
+    if (!installed) {
+      if (platform === 'github') {
+        printError('gh CLI is not installed.\n  Install it from: https://cli.github.com\n  Then run: gh auth login');
+      } else {
+        printError('az CLI is not installed.\n  Install it from: https://aka.ms/installazurecliwindows\n  Then run: az extension add --name azure-devops && az login');
+      }
       return;
     }
 
@@ -41,60 +54,49 @@ export async function prCommand(opts: { base?: string } = {}): Promise<void> {
     let llmResult = await llmRouter.generate({ task: 'pr', diff });
     spinner.succeed(`Proposal ready (${llmResult.provider})`);
 
-    let proposal = llmResult.proposal;
+    let finalPRTitle = llmResult.proposal.prTitle;
+    let finalPRDesc = llmResult.proposal.prDescription;
     let baseBranch = opts.base ?? config.git.baseBranch;
-    let accepted = false;
 
-    while (!accepted) {
-      printProposal(proposal, llmResult.provider, baseBranch);
-      const action = await promptMainAction(true);
+    // ── Confirm PR ────────────────────────────────────────────────────────────
+    while (true) {
+      printPRStep(finalPRTitle, finalPRDesc, baseBranch);
+      const action = await promptStepPR();
 
-      switch (action) {
-        case 'accept':
-          accepted = true;
-          break;
-
-        case 'edit_branch':
-          proposal.branchSuggestion = await promptEditBranch(proposal.branchSuggestion);
-          break;
-
-        case 'edit_commit':
-          proposal.commitMessage = await promptEditCommit(proposal.commitMessage);
-          break;
-
-        case 'edit_pr': {
-          const edited = await promptEditPR(proposal.prTitle, proposal.prDescription);
-          proposal.prTitle = edited.title;
-          proposal.prDescription = edited.description;
-          break;
-        }
-
-        case 'edit_base':
-          baseBranch = await promptEditBaseBranch(baseBranch);
-          break;
-
-        case 'regenerate':
-          spinner.start('Regenerating...');
-          llmResult = await llmRouter.generate({ task: 'pr', diff });
-          proposal = llmResult.proposal;
-          spinner.succeed(`New proposal ready (${llmResult.provider})`);
-          break;
-
-        case 'cancel':
-          printInfo('Cancelled. No PR created.');
-          return;
+      if (action === 'skip') {
+        printInfo('Cancelled. No PR created.');
+        return;
       }
+
+      if (action === 'accept') break;
+
+      if (action === 'edit') {
+        const edited = await promptEditPR(finalPRTitle, finalPRDesc);
+        finalPRTitle = edited.title;
+        finalPRDesc = edited.description;
+        // also offer base branch edit
+        const newBase = await promptEditBaseBranch(baseBranch);
+        baseBranch = newBase;
+        break;
+      }
+
+      // regenerate
+      spinner.start('Regenerating...');
+      llmResult = await llmRouter.generate({ task: 'pr', diff });
+      finalPRTitle = llmResult.proposal.prTitle;
+      finalPRDesc = llmResult.proposal.prDescription;
+      spinner.succeed(`New proposal (${llmResult.provider})`);
     }
 
-    spinner.start('Creating Pull Request...');
-    const platform = await detectPlatform();
+    // ── Create PR ─────────────────────────────────────────────────────────────
+    spinner.start(`Creating Pull Request via ${cliName}...`);
     let prUrl: string;
     let prId: string;
 
     if (platform === 'github') {
       const pr = await githubService.createPullRequest({
-        title: proposal.prTitle,
-        description: proposal.prDescription,
+        title: finalPRTitle,
+        description: finalPRDesc,
         sourceBranch: branch,
         targetBranch: baseBranch,
       });
@@ -102,8 +104,8 @@ export async function prCommand(opts: { base?: string } = {}): Promise<void> {
       prId = `#${pr.number}`;
     } else {
       const pr = await azureService.createPullRequest({
-        title: proposal.prTitle,
-        description: proposal.prDescription,
+        title: finalPRTitle,
+        description: finalPRDesc,
         sourceBranch: branch,
         targetBranch: baseBranch,
       });

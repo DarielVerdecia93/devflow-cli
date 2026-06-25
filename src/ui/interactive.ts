@@ -1,6 +1,54 @@
 import inquirer from 'inquirer';
 import { UserAction } from '../types';
 
+type StepAction = 'accept' | 'edit' | 'regenerate' | 'cancel';
+type PRStepAction = 'accept' | 'edit' | 'regenerate' | 'skip';
+
+export async function promptStepBranch(): Promise<StepAction> {
+  const { action } = await inquirer.prompt<{ action: StepAction }>([{
+    type: 'list',
+    name: 'action',
+    message: 'Branch name?',
+    choices: [
+      { name: 'Accept', value: 'accept' },
+      { name: 'Edit', value: 'edit' },
+      { name: 'Regenerate', value: 'regenerate' },
+      { name: 'Cancel', value: 'cancel' },
+    ],
+  }]);
+  return action;
+}
+
+export async function promptStepCommit(): Promise<StepAction> {
+  const { action } = await inquirer.prompt<{ action: StepAction }>([{
+    type: 'list',
+    name: 'action',
+    message: 'Commit message?',
+    choices: [
+      { name: 'Accept', value: 'accept' },
+      { name: 'Edit', value: 'edit' },
+      { name: 'Regenerate', value: 'regenerate' },
+      { name: 'Cancel', value: 'cancel' },
+    ],
+  }]);
+  return action;
+}
+
+export async function promptStepPR(): Promise<PRStepAction> {
+  const { action } = await inquirer.prompt<{ action: PRStepAction }>([{
+    type: 'list',
+    name: 'action',
+    message: 'Create this Pull Request?',
+    choices: [
+      { name: 'Accept', value: 'accept' },
+      { name: 'Edit title / description', value: 'edit' },
+      { name: 'Regenerate', value: 'regenerate' },
+      { name: 'Skip (no PR)', value: 'skip' },
+    ],
+  }]);
+  return action;
+}
+
 export async function promptMainAction(showBaseBranch = false): Promise<UserAction> {
   const choices = [
     { name: '  Accept all', value: 'accept' },
