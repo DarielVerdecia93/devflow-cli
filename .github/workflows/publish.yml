@@ -9,14 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write  # required for npm provenance
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
@@ -25,7 +25,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Get npm OIDC token
+        id: auth
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken('https://registry.npmjs.org/');
+            core.setSecret(token);
+            core.exportVariable('NODE_AUTH_TOKEN', token);
+
       - name: Publish with provenance
         run: npm publish --provenance --access=public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ env.NODE_AUTH_TOKEN }}
