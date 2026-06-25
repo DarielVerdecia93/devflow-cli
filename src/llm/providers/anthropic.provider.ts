@@ -13,7 +13,7 @@ export class AnthropicProvider implements LLMProvider {
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
     const { apiKey, model } = config.llm.anthropic;
-    const prompt = buildPromptForTask(request.task, request.diff);
+    const prompt = buildPromptForTask(request.task, request.diff, request.language);
 
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',

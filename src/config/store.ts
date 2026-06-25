@@ -83,6 +83,8 @@ export function configToEnv(): Record<string, string> {
     'llm.routing.analysis':   'LLM_ANALYSIS_PROVIDER',
     'llm.routing.default':    'LLM_DEFAULT_PROVIDER',
     'git.baseBranch':         'GIT_BASE_BRANCH',
+    'devflow.language':       'DEVFLOW_LANGUAGE',
+    'devflow.verbosity':      'DEVFLOW_VERBOSITY',
   };
 
   const result: Record<string, string> = {};
