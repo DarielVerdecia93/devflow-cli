@@ -1,7 +1,9 @@
 import ora from 'ora';
 import { gitService } from '../../git/service';
+import { detectPlatform } from '../../git/platform';
 import { llmRouter } from '../../llm/router';
 import { azureService } from '../../azure/service';
+import { githubService } from '../../github/service';
 import { printBanner, printProposal, printSuccess, printError, printInfo } from '../../ui/display';
 import {
   promptMainAction,
@@ -12,7 +14,7 @@ import {
 } from '../../ui/interactive';
 import { config } from '../../config';
 
-export async function prCommand(): Promise<void> {
+export async function prCommand(opts: { base?: string } = {}): Promise<void> {
   printBanner();
 
   const spinner = ora();
@@ -40,7 +42,7 @@ export async function prCommand(): Promise<void> {
     spinner.succeed(`Proposal ready (${llmResult.provider})`);
 
     let proposal = llmResult.proposal;
-    let baseBranch = config.git.baseBranch;
+    let baseBranch = opts.base ?? config.git.baseBranch;
     let accepted = false;
 
     while (!accepted) {
@@ -85,17 +87,33 @@ export async function prCommand(): Promise<void> {
     }
 
     spinner.start('Creating Pull Request...');
-    const pr = await azureService.createPullRequest({
-      title: proposal.prTitle,
-      description: proposal.prDescription,
-      sourceBranch: branch,
-      targetBranch: baseBranch,
-    });
+    const platform = await detectPlatform();
+    let prUrl: string;
+    let prId: string;
 
-    const url = azureService.buildPRUrl(pr.pullRequestId);
-    spinner.succeed(`PR created: #${pr.pullRequestId}`);
+    if (platform === 'github') {
+      const pr = await githubService.createPullRequest({
+        title: proposal.prTitle,
+        description: proposal.prDescription,
+        sourceBranch: branch,
+        targetBranch: baseBranch,
+      });
+      prUrl = await githubService.buildPRUrl(pr.number);
+      prId = `#${pr.number}`;
+    } else {
+      const pr = await azureService.createPullRequest({
+        title: proposal.prTitle,
+        description: proposal.prDescription,
+        sourceBranch: branch,
+        targetBranch: baseBranch,
+      });
+      prUrl = await azureService.buildPRUrl(pr.pullRequestId);
+      prId = `#${pr.pullRequestId}`;
+    }
+
+    spinner.succeed(`PR created: ${prId}`);
     printSuccess('Pull Request created successfully!');
-    printInfo(`URL: ${url}`);
+    printInfo(`URL: ${prUrl}`);
 
   } catch (err) {
     spinner.stop();

@@ -1,13 +1,14 @@
 {
   "name": "@dverdeciav/devflow-cli",
-  "version": "1.0.0",
-  "description": "AI-powered Git + Azure DevOps CLI with human-in-the-loop control",
+  "version": "1.1.0",
+  "description": "AI-powered Git CLI with human-in-the-loop control. Works with GitHub (gh) and Azure DevOps (az).",
   "main": "dist/cli/index.js",
   "bin": {
     "devflow": "dist/cli/index.js"
   },
   "files": [
     "dist/**",
+    "scripts/postinstall.js",
     ".env.example"
   ],
   "scripts": {
@@ -16,6 +17,7 @@
     "start": "node dist/cli/index.js",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
+    "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build",
     "build:exe": "npm run build && pkg dist/cli/index.js --targets node18-win-x64 --output devflow.exe --compress GZip"
   },

@@ -1,13 +1,11 @@
-import * as dotenv from 'dotenv';
 import { ProviderName, TaskType } from '../types';
 import { configToEnv } from './store';
 
-// Priority: env vars > local .env > ~/.config/devflow/config.json
+// Priority: system env vars > ~/.config/devflow/config.json
 const globalConfig = configToEnv();
 for (const [k, v] of Object.entries(globalConfig)) {
   if (!process.env[k]) process.env[k] = v;
 }
-dotenv.config();
 
 function required(key: string): string {
   const val = process.env[key];
@@ -31,11 +29,11 @@ export const config = {
     },
     gemini: {
       apiKey: optional('GEMINI_API_KEY'),
-      model: optional('GEMINI_MODEL', 'gemini-1.5-pro'),
+      model: optional('GEMINI_MODEL', 'gemini-2.0-flash'),
     },
     groq: {
       apiKey: optional('GROQ_API_KEY'),
-      model: optional('GROQ_MODEL', 'llama3-70b-8192'),
+      model: optional('GROQ_MODEL', 'llama-3.3-70b-versatile'),
     },
     routing: {
       commit: optional('LLM_COMMIT_PROVIDER', 'groq') as ProviderName,
@@ -44,12 +42,6 @@ export const config = {
       default: optional('LLM_DEFAULT_PROVIDER', 'openai') as ProviderName,
     },
   },
-  azure: {
-    org: optional('AZURE_DEVOPS_ORG'),
-    project: optional('AZURE_DEVOPS_PROJECT'),
-    repo: optional('AZURE_DEVOPS_REPO'),
-    token: optional('AZURE_DEVOPS_TOKEN'),
-  },
   git: {
     baseBranch: optional('GIT_BASE_BRANCH', 'main'),
   },
@@ -57,10 +49,6 @@ export const config = {
 
 export function getProviderForTask(task: TaskType): ProviderName {
   return config.llm.routing[task] ?? config.llm.routing.default;
-}
-
-export function isAzureConfigured(): boolean {
-  return !!(config.azure.org && config.azure.project && config.azure.repo && config.azure.token);
 }
 
 export function isProviderConfigured(provider: ProviderName): boolean {

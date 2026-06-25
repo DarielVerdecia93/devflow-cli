@@ -3,6 +3,8 @@ import { gitService } from '../../git/service';
 import { llmRouter } from '../../llm/router';
 import { azureService } from '../../azure/service';
 import { printBanner, printGitStatus, printError, printInfo } from '../../ui/display';
+import { detectPlatform } from '../../git/platform';
+import { githubService } from '../../github/service';
 import chalk from 'chalk';
 
 export async function statusCommand(): Promise<void> {
@@ -35,12 +37,26 @@ export async function statusCommand(): Promise<void> {
       providers.forEach(p => console.log(chalk.green(`    ✓ ${p}`)));
     }
 
-    // Show Azure DevOps status
-    console.log(chalk.bold('\n  Azure DevOps:'));
-    if (azureService.isConfigured()) {
-      console.log(chalk.green('    ✓ Configured'));
+    // Show platform status
+    const platform = await detectPlatform();
+
+    console.log(chalk.bold('\n  Git Platform:'));
+    if (platform === 'github') {
+      console.log(chalk.cyan('    GitHub detected'));
+      if (githubService.isInstalled()) {
+        console.log(chalk.green('    ✓ gh CLI installed'));
+      } else {
+        console.log(chalk.red('    ✗ gh CLI not found — install from: https://cli.github.com'));
+      }
+    } else if (platform === 'azure') {
+      console.log(chalk.cyan('    Azure DevOps detected'));
+      if (azureService.isInstalled()) {
+        console.log(chalk.green('    ✓ az CLI installed'));
+      } else {
+        console.log(chalk.red('    ✗ az CLI not found — install from: https://aka.ms/installazurecliwindows'));
+      }
     } else {
-      console.log(chalk.yellow('    Not configured (set AZURE_DEVOPS_* vars in .env)'));
+      console.log(chalk.yellow('    Unknown platform (no GitHub or Azure DevOps remote detected)'));
     }
 
     console.log('');

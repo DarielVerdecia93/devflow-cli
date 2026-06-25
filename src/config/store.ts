@@ -82,10 +82,6 @@ export function configToEnv(): Record<string, string> {
     'llm.routing.pr':         'LLM_PR_PROVIDER',
     'llm.routing.analysis':   'LLM_ANALYSIS_PROVIDER',
     'llm.routing.default':    'LLM_DEFAULT_PROVIDER',
-    'azure.org':              'AZURE_DEVOPS_ORG',
-    'azure.project':          'AZURE_DEVOPS_PROJECT',
-    'azure.repo':             'AZURE_DEVOPS_REPO',
-    'azure.token':            'AZURE_DEVOPS_TOKEN',
     'git.baseBranch':         'GIT_BASE_BRANCH',
   };
 

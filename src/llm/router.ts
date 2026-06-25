@@ -36,8 +36,13 @@ export class LLMRouter {
           console.warn(`  [LLM] Fell back to ${name} after: ${errors.map(e => e.provider).join(', ')}`);
         }
         return result;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+      } catch (err: unknown) {
+        let msg = err instanceof Error ? err.message : String(err);
+        // Include API response body if available (axios error)
+        const axiosErr = err as { response?: { data?: unknown; status?: number } };
+        if (axiosErr?.response?.data) {
+          msg += ` — ${JSON.stringify(axiosErr.response.data)}`;
+        }
         errors.push({ provider: name, error: msg });
       }
     }
