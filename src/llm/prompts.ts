@@ -1,17 +1,33 @@
 import { TaskType } from '../types';
 
-export function buildPromptForTask(task: TaskType, diff: string): string {
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English', es: 'Spanish', pt: 'Portuguese', fr: 'French',
+  de: 'German',  it: 'Italian', zh: 'Chinese',    ja: 'Japanese',
+  ko: 'Korean',  ru: 'Russian', ar: 'Arabic',      nl: 'Dutch',
+};
+
+function langInstruction(language: string): string {
+  if (!language || language === 'en') return '';
+  const name = LANGUAGE_NAMES[language] ?? language;
+  return `\n━━━ OUTPUT LANGUAGE ━━━
+Write the commit message description, PR title, and PR description in ${name} (${language}).
+Exception: keep the Conventional Commits type prefix and scope in English (feat/fix/chore/etc.) — that is part of the spec.
+Branch slug: lowercase-hyphens — you may use words from ${name} transliterated to ASCII.\n`;
+}
+
+export function buildPromptForTask(task: TaskType, diff: string, language = 'en'): string {
   switch (task) {
-    case 'commit':   return buildCommitPrompt(diff);
-    case 'pr':       return buildPRPrompt(diff);
-    case 'analysis': return buildAnalysisPrompt(diff);
+    case 'commit':   return buildCommitPrompt(diff, language);
+    case 'pr':       return buildPRPrompt(diff, language);
+    case 'analysis': return buildAnalysisPrompt(diff, language);
   }
 }
 
 // ── Commit-focused prompt ─────────────────────────────────────────────────────
 
-function buildCommitPrompt(diff: string): string {
+function buildCommitPrompt(diff: string, language = 'en'): string {
   return `You are an expert software engineer writing a git commit following Conventional Commits strictly.
+${langInstruction(language)}
 
 Analyze the git diff below and respond with a JSON object ONLY — no prose, no markdown fences.
 
@@ -93,8 +109,9 @@ Respond with this exact JSON (no other text):
 
 // ── PR-focused prompt ─────────────────────────────────────────────────────────
 
-function buildPRPrompt(diff: string): string {
+function buildPRPrompt(diff: string, language = 'en'): string {
   return `You are an expert software engineer writing a Pull Request for code review.
+${langInstruction(language)}
 
 Analyze the git diff below and respond with a JSON object ONLY — no prose, no markdown fences.
 
@@ -149,8 +166,9 @@ Respond with this exact JSON (no other text):
 
 // ── Full analysis prompt (used by devflow flow) ───────────────────────────────
 
-function buildAnalysisPrompt(diff: string): string {
+function buildAnalysisPrompt(diff: string, language = 'en'): string {
   return `You are an expert software engineer performing a full Git workflow analysis.
+${langInstruction(language)}
 
 Analyze the git diff below and respond with a JSON object ONLY — no prose, no markdown fences.
 

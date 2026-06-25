@@ -45,6 +45,10 @@ export const config = {
   git: {
     baseBranch: optional('GIT_BASE_BRANCH', 'main'),
   },
+  devflow: {
+    language:  optional('DEVFLOW_LANGUAGE', 'en'),
+    verbosity: optional('DEVFLOW_VERBOSITY', 'normal') as 'minimal' | 'normal' | 'verbose',
+  },
 };
 
 export function getProviderForTask(task: TaskType): ProviderName {

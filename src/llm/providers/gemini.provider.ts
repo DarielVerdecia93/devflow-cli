@@ -13,7 +13,7 @@ export class GeminiProvider implements LLMProvider {
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
     const { apiKey, model } = config.llm.gemini;
-    const prompt = buildPromptForTask(request.task, request.diff);
+    const prompt = buildPromptForTask(request.task, request.diff, request.language);
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 

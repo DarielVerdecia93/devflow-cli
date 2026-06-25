@@ -40,6 +40,7 @@ export interface LLMRequest {
   task: TaskType;
   diff: string;
   context?: string;
+  language?: string;
 }
 
 export interface LLMResponse {

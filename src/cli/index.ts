@@ -23,11 +23,11 @@ First time? Run the setup wizard:
   3. devflow status
 
 Commands:
-  devflow commit [-b <branch>]    analyze → propose → approve → push
-  devflow pr     [-b <branch>]    generate PR on GitHub or Azure DevOps
-  devflow flow   [-b <branch>]    full pipeline: branch → commit → push → PR
-  devflow status                  repo state, platform detection, LLM providers
-  devflow config <action> [key]   manage global config
+  devflow commit [-b <branch>] [--lang <iso>]    analyze → propose → approve → push
+  devflow pr     [-b <branch>] [--lang <iso>]    generate PR on GitHub or Azure DevOps
+  devflow flow   [-b <branch>] [--lang <iso>]    full pipeline: branch → commit → push → PR
+  devflow status                                 repo state, platform detection, LLM providers
+  devflow config <action> [key]                  manage global config
 
   For details on a specific command:
     devflow commit --help
@@ -40,25 +40,25 @@ program
   .command('commit')
   .description('Analyze staged changes, propose branch + commit, wait for approval, then push')
   .option('-b, --base <branch>', 'base branch to merge into (default: main or git.baseBranch config)')
+  .option('--lang <iso>', 'language for AI output, e.g. es, en, fr, pt (overrides devflow.language config)')
   .addHelpText('after', `
 How it works:
   1. Reads your git diff (staged + unstaged)
   2. Sends it to the configured LLM (default: Groq)
   3. Proposes a branch name and commit message
-  4. Shows an interactive menu — nothing runs until you approve
+  4. Shows step-by-step prompts — nothing runs until you approve each step
   5. Creates the branch, commits, and pushes
 
-Options after proposal:
-  Accept all          execute everything as proposed
-  Edit branch name    change the branch name before creating
-  Edit commit message tweak the commit message
-  Regenerate          ask the AI to try again
-  Cancel              exit without touching anything
+Steps:
+  Branch confirm     accept / edit / regenerate / cancel
+  Commit confirm     accept / edit / regenerate / cancel
+  PR confirm         accept / edit / regenerate / skip
 
 Examples:
   $ devflow commit
   $ devflow commit --base develop
-  $ devflow commit -b release/2.0
+  $ devflow commit --lang es
+  $ devflow commit -b release/2.0 --lang pt
 `)
   .action(commitCommand);
 
@@ -66,12 +66,13 @@ program
   .command('pr')
   .description('Generate a Pull Request for the current branch and create it on GitHub or Azure DevOps')
   .option('-b, --base <branch>', 'base branch to merge into (default: main or git.baseBranch config)')
+  .option('--lang <iso>', 'language for AI output, e.g. es, en, fr, pt (overrides devflow.language config)')
   .addHelpText('after', `
 How it works:
   1. Reads the current branch and its diff against the base branch
   2. Sends it to the configured LLM (default: Anthropic)
   3. Proposes a PR title and description
-  4. Shows an interactive menu — nothing is created until you approve
+  4. Shows an interactive prompt — nothing is created until you approve
   5. Creates the PR on GitHub or Azure DevOps (auto-detected from git remote)
 
 Platform detection:
@@ -82,7 +83,8 @@ Platform detection:
 Examples:
   $ devflow pr
   $ devflow pr --base develop
-  $ devflow pr -b release/1.0
+  $ devflow pr --lang es
+  $ devflow pr -b release/1.0 --lang fr
 `)
   .action(prCommand);
 
@@ -90,19 +92,19 @@ program
   .command('flow')
   .description('Full pipeline in one command: branch → commit → push → PR')
   .option('-b, --base <branch>', 'base branch to merge into (default: main or git.baseBranch config)')
+  .option('--lang <iso>', 'language for AI output, e.g. es, en, fr, pt (overrides devflow.language config)')
   .addHelpText('after', `
 How it works:
   1. Reads your git diff and analyzes it with AI
   2. Proposes branch name, commit message, PR title and description
-  3. Shows an interactive menu — you review and approve each step
+  3. Step-by-step confirmation — you approve each item before anything runs
   4. Creates the branch, commits, pushes, and opens the PR
-
-Same approval menu as devflow commit — nothing executes without your ok.
 
 Examples:
   $ devflow flow
   $ devflow flow --base develop
-  $ devflow flow -b release/2.0
+  $ devflow flow --lang es
+  $ devflow flow -b release/2.0 --lang de
 `)
   .action(flowCommand);
 
@@ -131,7 +133,7 @@ program
   .command('config <action> [key] [value]')
   .description('Manage global config stored in ~/.config/devflow/config.json')
   .addHelpText('before', `
-Available keys and their equivalent .env variable:
+Available keys and their equivalent env variable:
 
   LLM API keys (at least one required):
     llm.openai.apiKey        → OPENAI_API_KEY        (sk-...)
@@ -149,8 +151,14 @@ Available keys and their equivalent .env variable:
     llm.gemini.model         → GEMINI_MODEL          default: gemini-2.0-flash
                                options: gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash
 
-  Other:
+  Git:
     git.baseBranch           → GIT_BASE_BRANCH       default: main
+
+  DevFlow preferences:
+    devflow.language         → DEVFLOW_LANGUAGE      default: en
+                               options: en, es, pt, fr, de, it, zh, ja, ko, ru
+    devflow.verbosity        → DEVFLOW_VERBOSITY     default: normal
+                               options: minimal, normal, verbose
 
   LLM routing (optional):
     llm.routing.commit       → LLM_COMMIT_PROVIDER   default: groq
@@ -170,7 +178,8 @@ Actions:
 
 Examples:
   $ devflow config set llm.groq.apiKey gsk_...
-  $ devflow config set llm.groq.model llama-3.1-8b-instant
+  $ devflow config set devflow.language es
+  $ devflow config set devflow.verbosity minimal
   $ devflow config set git.baseBranch develop
   $ devflow config get llm.groq.apiKey
   $ devflow config delete llm.openai.apiKey

@@ -34,6 +34,25 @@ const MODELS: Record<string, { name: string; value: string }[]> = {
   ],
 };
 
+const LANGUAGES = [
+  { name: 'English    (en)  — recommended, best LLM support', value: 'en' },
+  { name: 'Spanish    (es)',                                   value: 'es' },
+  { name: 'Portuguese (pt)',                                   value: 'pt' },
+  { name: 'French     (fr)',                                   value: 'fr' },
+  { name: 'German     (de)',                                   value: 'de' },
+  { name: 'Italian    (it)',                                   value: 'it' },
+  { name: 'Chinese    (zh)',                                   value: 'zh' },
+  { name: 'Japanese   (ja)',                                   value: 'ja' },
+  { name: 'Korean     (ko)',                                   value: 'ko' },
+  { name: 'Russian    (ru)',                                   value: 'ru' },
+];
+
+const VERBOSITY_OPTIONS = [
+  { name: 'normal   — proposals + key steps                  (recommended)', value: 'normal' },
+  { name: 'minimal  — only prompts and errors, no banner',                   value: 'minimal' },
+  { name: 'verbose  — full output with confidence score and risk level',     value: 'verbose' },
+];
+
 function printStep(n: number, total: number, title: string) {
   console.log(`\n${chalk.cyan(`  Step ${n}/${total}`)} ${chalk.bold(title)}`);
   console.log(chalk.gray('  ' + '─'.repeat(48)));
@@ -57,7 +76,7 @@ export async function initCommand(): Promise<void> {
   console.log(chalk.gray('  save everything to ~/.config/devflow/config.json'));
   console.log('');
 
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 6;
 
   // ── Step 1: Choose provider ────────────────────────────────────────────────
   printStep(1, TOTAL_STEPS, 'Choose your LLM provider');
@@ -117,14 +136,43 @@ export async function initCommand(): Promise<void> {
     default: configGet('git.baseBranch') ?? 'main',
   }]);
 
+  // ── Step 5: Language ──────────────────────────────────────────────────────
+  printStep(5, TOTAL_STEPS, 'Output language');
+  console.log(chalk.gray('  Language for branch slugs, commit messages, PR titles and descriptions.'));
+  console.log(chalk.gray('  Can be overridden per command with --lang <iso>.\n'));
+
+  const { language } = await inquirer.prompt([{
+    type: 'list',
+    name: 'language',
+    message: 'Default output language:',
+    choices: LANGUAGES,
+    default: configGet('devflow.language') ?? 'en',
+  }]);
+
+  // ── Step 6: Verbosity ─────────────────────────────────────────────────────
+  printStep(6, TOTAL_STEPS, 'Verbosity level');
+  console.log(chalk.gray('  Controls how much output DevFlow shows during operations.\n'));
+
+  const { verbosity } = await inquirer.prompt([{
+    type: 'list',
+    name: 'verbosity',
+    message: 'Output verbosity:',
+    choices: VERBOSITY_OPTIONS,
+    default: configGet('devflow.verbosity') ?? 'normal',
+  }]);
+
   // ── Save ───────────────────────────────────────────────────────────────────
   console.log('\n');
   configSet(`llm.${provider}.apiKey`, apiKey.trim());
   configSet(`llm.${provider}.model`, model);
   configSet('git.baseBranch', baseBranch);
+  configSet('devflow.language', language);
+  configSet('devflow.verbosity', verbosity);
   printOk(`${provider} API key saved`);
   printOk(`Model: ${model}`);
   printOk(`Base branch: ${baseBranch}`);
+  printOk(`Language: ${language}`);
+  printOk(`Verbosity: ${verbosity}`);
 
   // ── Platform check ─────────────────────────────────────────────────────────
   console.log(chalk.bold('\n  Git Platform'));

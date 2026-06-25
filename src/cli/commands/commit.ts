@@ -16,8 +16,8 @@ import {
 } from '../../ui/interactive';
 import { config } from '../../config';
 
-export async function commitCommand(opts: { base?: string } = {}): Promise<void> {
-  printBanner();
+export async function commitCommand(opts: { base?: string; lang?: string } = {}): Promise<void> {
+  if (config.devflow.verbosity !== 'minimal') printBanner();
   const spinner = ora();
 
   try {
@@ -56,9 +56,14 @@ export async function commitCommand(opts: { base?: string } = {}): Promise<void>
       return;
     }
 
+    const language = opts.lang ?? config.devflow.language;
+
     spinner.start('Generating proposal...');
-    let llmResult = await llmRouter.generate({ task: 'commit', diff });
+    let llmResult = await llmRouter.generate({ task: 'commit', diff, language });
     spinner.succeed(`Proposal ready (${llmResult.provider})`);
+    if (config.devflow.verbosity === 'verbose') {
+      printInfo(`Confidence: ${llmResult.proposal.confidenceScore}%  ·  Risk: ${llmResult.proposal.riskLevel}`);
+    }
 
     let proposal = llmResult.proposal;
     const baseBranch = opts.base ?? config.git.baseBranch;
@@ -71,9 +76,8 @@ export async function commitCommand(opts: { base?: string } = {}): Promise<void>
       if (action === 'accept') break;
       if (action === 'edit') { finalBranch = await promptEditBranch(finalBranch); break; }
       if (action === 'cancel') { printInfo('Cancelled. No changes made.'); return; }
-      // regenerate
       spinner.start('Regenerating...');
-      llmResult = await llmRouter.generate({ task: 'commit', diff });
+      llmResult = await llmRouter.generate({ task: 'commit', diff, language });
       proposal = llmResult.proposal;
       finalBranch = proposal.branchSuggestion;
       spinner.succeed(`New proposal (${llmResult.provider})`);
@@ -87,9 +91,8 @@ export async function commitCommand(opts: { base?: string } = {}): Promise<void>
       if (action === 'accept') break;
       if (action === 'edit') { finalCommit = await promptEditCommit(finalCommit); break; }
       if (action === 'cancel') { printInfo('Cancelled. No changes made.'); return; }
-      // regenerate
       spinner.start('Regenerating...');
-      llmResult = await llmRouter.generate({ task: 'commit', diff });
+      llmResult = await llmRouter.generate({ task: 'commit', diff, language });
       proposal = llmResult.proposal;
       finalCommit = proposal.commitMessage;
       spinner.succeed(`New proposal (${llmResult.provider})`);
@@ -125,9 +128,8 @@ export async function commitCommand(opts: { base?: string } = {}): Promise<void>
         );
         break;
       }
-      // regenerate
       spinner.start('Regenerating PR proposal...');
-      llmResult = await llmRouter.generate({ task: 'pr', diff });
+      llmResult = await llmRouter.generate({ task: 'pr', diff, language });
       finalPRTitle = llmResult.proposal.prTitle;
       finalPRDesc = llmResult.proposal.prDescription;
       spinner.succeed(`New PR proposal (${llmResult.provider})`);

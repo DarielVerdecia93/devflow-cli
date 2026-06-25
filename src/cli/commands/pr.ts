@@ -12,8 +12,8 @@ import {
 } from '../../ui/interactive';
 import { config } from '../../config';
 
-export async function prCommand(opts: { base?: string } = {}): Promise<void> {
-  printBanner();
+export async function prCommand(opts: { base?: string; lang?: string } = {}): Promise<void> {
+  if (config.devflow.verbosity !== 'minimal') printBanner();
 
   const spinner = ora();
 
@@ -50,9 +50,14 @@ export async function prCommand(opts: { base?: string } = {}): Promise<void> {
     ]);
     spinner.stop();
 
+    const language = opts.lang ?? config.devflow.language;
+
     spinner.start('Generating PR proposal...');
-    let llmResult = await llmRouter.generate({ task: 'pr', diff });
+    let llmResult = await llmRouter.generate({ task: 'pr', diff, language });
     spinner.succeed(`Proposal ready (${llmResult.provider})`);
+    if (config.devflow.verbosity === 'verbose') {
+      printInfo(`Confidence: ${llmResult.proposal.confidenceScore}%  ·  Risk: ${llmResult.proposal.riskLevel}`);
+    }
 
     let finalPRTitle = llmResult.proposal.prTitle;
     let finalPRDesc = llmResult.proposal.prDescription;
@@ -74,15 +79,13 @@ export async function prCommand(opts: { base?: string } = {}): Promise<void> {
         const edited = await promptEditPR(finalPRTitle, finalPRDesc);
         finalPRTitle = edited.title;
         finalPRDesc = edited.description;
-        // also offer base branch edit
         const newBase = await promptEditBaseBranch(baseBranch);
         baseBranch = newBase;
         break;
       }
 
-      // regenerate
       spinner.start('Regenerating...');
-      llmResult = await llmRouter.generate({ task: 'pr', diff });
+      llmResult = await llmRouter.generate({ task: 'pr', diff, language });
       finalPRTitle = llmResult.proposal.prTitle;
       finalPRDesc = llmResult.proposal.prDescription;
       spinner.succeed(`New proposal (${llmResult.provider})`);

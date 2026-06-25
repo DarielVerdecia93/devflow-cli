@@ -13,7 +13,7 @@ export class GroqProvider implements LLMProvider {
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
     const { apiKey, model } = config.llm.groq;
-    const prompt = buildPromptForTask(request.task, request.diff);
+    const prompt = buildPromptForTask(request.task, request.diff, request.language);
 
     const response = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
