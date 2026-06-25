@@ -1,0 +1,63 @@
+{
+  "name": "@dverdeciav/devflow-cli",
+  "version": "1.0.0",
+  "description": "AI-powered Git + Azure DevOps CLI with human-in-the-loop control",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "devflow": "dist/cli/index.js"
+  },
+  "files": [
+    "dist/**",
+    ".env.example"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean",
+    "prepublishOnly": "npm run build",
+    "build:exe": "npm run build && pkg dist/cli/index.js --targets node18-win-x64 --output devflow.exe --compress GZip"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "pkg": {
+    "scripts": "dist/**/*.js",
+    "assets": [],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "."
+  },
+  "keywords": [
+    "git",
+    "azure-devops",
+    "ai",
+    "cli",
+    "devops"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "inquirer": "^8.2.6",
+    "ora": "^5.4.1",
+    "simple-git": "^3.25.0",
+    "table": "^6.8.2"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^8.2.10",
+    "@types/node": "^20.14.2",
+    "pkg": "^5.8.1",
+    "rimraf": "^5.0.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
