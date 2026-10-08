@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name('devflow')
   .description('AI-powered Git CLI with human-in-the-loop control. Works with GitHub and Azure DevOps.')
-  .version('1.1.0')
+  .version('1.2.0')
   .addHelpText('after', `
 First time? Run the setup wizard:
   $ devflow init
